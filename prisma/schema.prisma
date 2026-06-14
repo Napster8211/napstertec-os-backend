@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --- ENUMS: Enforcing Strict System States ---
+enum SystemRole {
+  EXECUTIVE_TECHNICAL_DIRECTOR
+  BUSINESS_DEVELOPMENT
+  MARKETING
+  ENGINEER
+  CLIENT
+}
+
+enum LeadStatus {
+  NEW_LEAD
+  CONTACTED
+  DEMO_SCHEDULED
+  PROPOSAL_SENT
+  NEGOTIATION
+  CLOSED_WON
+  REJECTED
+}
+
+enum ProjectStatus {
+  PLANNING
+  DEVELOPMENT
+  TESTING
+  DEPLOYED
+  MAINTENANCE
+}
+
+// --- MODELS ---
+
+model User {
+  id             String     @id @default(uuid())
+  email          String     @unique
+  passwordHash   String
+  fullName       String
+  role           SystemRole @default(ENGINEER)
+  
+  // RBAC Array: Granular system permissions stored as strings
+  permissions    String[]   
+  
+  profileImage   String?
+  isActive       Boolean    @default(true)
+  
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  // Relations
+  assignedLeads  Lead[]
+  projects       Project[]  @relation("ProjectTeam")
+  auditLogs      AuditLog[]
+}
+
+model Lead {
+  id             String     @id @default(uuid())
+  companyName    String
+  contactPerson  String
+  email          String
+  phone          String?
+  status         LeadStatus @default(NEW_LEAD)
+  
+  meetingNotes   String?    @db.Text
+  proposalLink   String?
+  nextFollowUp   DateTime?
+  
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  // Assigned Team Member
+  assignedToId   String?
+  assignedTo     User?      @relation(fields: [assignedToId], references: [id])
+}
+
+model Project {
+  id             String        @id @default(uuid())
+  title          String
+  description    String        @db.Text
+  status         ProjectStatus @default(PLANNING)
+  repoUrl        String?
+  deploymentUrl  String?
+  deadline       DateTime?
+  
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // The team assigned to this project
+  team           User[]        @relation("ProjectTeam")
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  action         String   // e.g., "DEPLOY_PROJECT", "DELETE_LEAD"
+  metadata       Json?    // Stores IP, device info, or changed data payload
+  timestamp      DateTime @default(now())
+
+  // Who performed the action
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id])
+}
