@@ -3,7 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const jwt = require('jsonwebtoken');
-const cookieParser = require('cookie-parser');
 const bcrypt = require('bcryptjs');
 const { PrismaClient } = require('@prisma/client');
 
@@ -17,21 +16,18 @@ const prisma = new PrismaClient({ adapter });
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// CRITICAL FIX: Tells Express to trust the Render/Vercel Load Balancers
-app.set('trust proxy', 1);
-
 app.use(helmet());
-app.use(cookieParser()); 
 
+// Because we aren't using cookies, CORS is much simpler and impossible to block
 app.use(cors({
-    origin: true, 
-    credentials: true,               
+    origin: '*', // Accept traffic from absolutely anywhere
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json());
 
+// --- SECURE LOGIN: Issues Bearer Token ---
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body; 
 
@@ -52,25 +48,23 @@ app.post('/api/login', async (req, res) => {
             { expiresIn: '8h' }
         );
 
-        res.cookie('os_session', token, {
-            httpOnly: true, 
-            secure: true, 
-            // CRITICAL FIX: Reverted to 'lax' because the proxy makes it a 1st-party cookie
-            sameSite: 'lax',
-            path: '/', 
-            maxAge: 8 * 60 * 60 * 1000 
-        });
-
-        res.json({ success: true, role: user.role, name: user.fullName });
+        // Send token DIRECTLY in the JSON payload, bypass cookies entirely
+        res.json({ success: true, token, role: user.role, name: user.fullName });
     } catch (error) {
         console.error("Login Error:", error);
         res.status(500).json({ error: 'Internal system failure.' });
     }
 });
 
+// --- SESSION VERIFICATION: Reads Bearer Token ---
 app.get('/api/auth/me', async (req, res) => {
-    const token = req.cookies.os_session;
-    if (!token) return res.status(401).json({ isAuthenticated: false });
+    // Extract token from the Authorization header (Format: "Bearer <token>")
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ isAuthenticated: false });
+    }
+
+    const token = authHeader.split(' ')[1];
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'napstertec_master_key_998877');
@@ -85,11 +79,6 @@ app.get('/api/auth/me', async (req, res) => {
     } catch (err) {
         res.status(401).json({ isAuthenticated: false });
     }
-});
-
-app.post('/api/logout', (req, res) => {
-    res.clearCookie('os_session', { path: '/', sameSite: 'lax', secure: true });
-    res.json({ success: true });
 });
 
 app.listen(PORT, () => {
