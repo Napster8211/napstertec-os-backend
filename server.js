@@ -76,7 +76,48 @@ app.get('/api/auth/me', async (req, res) => {
         
         const user = await prisma.user.findUnique({ 
             where: { id: decoded.userId },
-            select: { id: true, email: true, fullName: true, role: true, permissions: true }
+            select: { 
+                id: true, 
+                email: true, 
+                fullName: true, 
+                role: true, 
+                permissions: true,
+                isActive: true // <--- CRITICAL FIX: Tell Prisma to fetch this field!
+            }
+        });
+        
+        const user = await prisma.user.findUnique({ 
+            where: { id: decoded.userId },
+            select: { 
+                id: true, 
+                email: true, 
+                fullName: true, 
+                role: true, 
+                permissions: true,
+                isActive: true // <--- CRITICAL FIX: Tell Prisma to fetch this field!
+            }
+        });
+        const user = await prisma.user.findUnique({ 
+            where: { id: decoded.userId },
+            select: { 
+                id: true, 
+                email: true, 
+                fullName: true, 
+                role: true, 
+                permissions: true,
+                isActive: true // <--- CRITICAL FIX: Tell Prisma to fetch this field!
+            }
+        });
+        const user = await prisma.user.findUnique({ 
+            where: { id: decoded.userId },
+            select: { 
+                id: true, 
+                email: true, 
+                fullName: true, 
+                role: true, 
+                permissions: true,
+                isActive: true // <--- CRITICAL FIX: Tell Prisma to fetch this field!
+            }
         });
         
         if (!user || !user.isActive) {
