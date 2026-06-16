@@ -146,3 +146,57 @@ app.get('/api/team', async (req, res) => {
         res.status(500).json({ error: "Failed to retrieve team data." });
     }
 });
+
+// --- PROVISION NEW USER: RBAC PROTECTED ---
+app.post('/api/team/provision', async (req, res) => {
+    console.log("[BACKEND] ⚡ Provisioning new personnel...");
+    
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: "Unauthorized access" });
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'napstertec_master_key_998877');
+        
+        // Strict RBAC Enforcement
+        if (decoded.role !== 'EXECUTIVE_TECHNICAL_DIRECTOR') {
+            return res.status(403).json({ error: "Insufficient clearance. Only Directors can provision users." });
+        }
+
+        const { fullName, email, password, role } = req.body;
+
+        if (!fullName || !email || !password || !role) {
+            return res.status(400).json({ error: "Missing required personnel data." });
+        }
+
+        // Check if user already exists
+        const existingUser = await prisma.user.findUnique({ where: { email } });
+        if (existingUser) {
+            return res.status(400).json({ error: "Email already registered in system." });
+        }
+
+        // Encrypt the password
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(password, salt);
+
+        // Provision the user in Supabase
+        const newUser = await prisma.user.create({
+            data: {
+                fullName,
+                email,
+                passwordHash,
+                role,
+                permissions: role === 'BUSINESS_DEVELOPMENT' ? ['manage_leads'] : ['view_projects'] // Basic default permissions
+            },
+            select: { id: true, fullName: true, email: true, role: true, isActive: true, createdAt: true }
+        });
+
+        res.json({ success: true, user: newUser });
+    } catch (err) {
+        console.error("[BACKEND] ❌ Provisioning Error:", err.message);
+        res.status(500).json({ error: "Failed to provision personnel." });
+    }
+});
