@@ -74,6 +74,7 @@ app.get('/api/auth/me', async (req, res) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'napstertec_master_key_998877');
         console.log("[BACKEND CATCHER] ✅ Token successfully decoded for User ID:", decoded.userId);
         
+        // The one and only user declaration
         const user = await prisma.user.findUnique({ 
             where: { id: decoded.userId },
             select: { 
@@ -82,41 +83,7 @@ app.get('/api/auth/me', async (req, res) => {
                 fullName: true, 
                 role: true, 
                 permissions: true,
-                isActive: true // <--- CRITICAL FIX: Tell Prisma to fetch this field!
-            }
-        });
-        
-        const user = await prisma.user.findUnique({ 
-            where: { id: decoded.userId },
-            select: { 
-                id: true, 
-                email: true, 
-                fullName: true, 
-                role: true, 
-                permissions: true,
-                isActive: true // <--- CRITICAL FIX: Tell Prisma to fetch this field!
-            }
-        });
-        const user = await prisma.user.findUnique({ 
-            where: { id: decoded.userId },
-            select: { 
-                id: true, 
-                email: true, 
-                fullName: true, 
-                role: true, 
-                permissions: true,
-                isActive: true // <--- CRITICAL FIX: Tell Prisma to fetch this field!
-            }
-        });
-        const user = await prisma.user.findUnique({ 
-            where: { id: decoded.userId },
-            select: { 
-                id: true, 
-                email: true, 
-                fullName: true, 
-                role: true, 
-                permissions: true,
-                isActive: true // <--- CRITICAL FIX: Tell Prisma to fetch this field!
+                isActive: true // <-- The missing key that caused the rejection
             }
         });
         
