@@ -18,9 +18,9 @@ const PORT = process.env.PORT || 5000;
 
 app.use(helmet());
 
-// Because we aren't using cookies, CORS is much simpler and impossible to block
+// Accept traffic from your Vercel frontend natively
 app.use(cors({
-    origin: '*', // Accept traffic from absolutely anywhere
+    origin: '*', 
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -34,7 +34,7 @@ app.post('/api/login', async (req, res) => {
     try {
         const user = await prisma.user.findUnique({ where: { email: username } });
         if (!user || !user.isActive) {
-            return res.status(401).json({ error: 'Invalid credentials or account suspended.' });
+            return res.status(401).json({ error: 'Invalid credentials.' });
         }
 
         const validPassword = await bcrypt.compare(password, user.passwordHash);
@@ -48,7 +48,7 @@ app.post('/api/login', async (req, res) => {
             { expiresIn: '8h' }
         );
 
-        // Send token DIRECTLY in the JSON payload, bypass cookies entirely
+        // Send token DIRECTLY to frontend memory, completely bypassing cookies
         res.json({ success: true, token, role: user.role, name: user.fullName });
     } catch (error) {
         console.error("Login Error:", error);
@@ -58,8 +58,8 @@ app.post('/api/login', async (req, res) => {
 
 // --- SESSION VERIFICATION: Reads Bearer Token ---
 app.get('/api/auth/me', async (req, res) => {
-    // Extract token from the Authorization header (Format: "Bearer <token>")
     const authHeader = req.headers.authorization;
+    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ isAuthenticated: false });
     }
