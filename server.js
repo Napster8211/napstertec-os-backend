@@ -200,3 +200,26 @@ app.post('/api/team/provision', async (req, res) => {
         res.status(500).json({ error: "Failed to provision personnel." });
     }
 });
+
+// --- PUBLIC ROUTE: VISITOR TEAM PAGE ---
+// Notice there is NO token verification here. This is open to the public internet.
+app.get('/api/public/team', async (req, res) => {
+    try {
+        const team = await prisma.user.findMany({
+            where: { isActive: true }, // Only show active employees
+            select: {
+                id: true,
+                fullName: true,
+                role: true,
+                bio: true,
+                profileImage: true
+            },
+            orderBy: { createdAt: 'asc' } // Keeps the founders at the top
+        });
+
+        res.json({ success: true, team });
+    } catch (err) {
+        console.error("[BACKEND] ❌ Public Team Route Error:", err.message);
+        res.status(500).json({ error: "Failed to load public team data." });
+    }
+});

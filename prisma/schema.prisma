@@ -47,6 +47,7 @@ model User {
   permissions    String[]   
   
   profileImage   String?
+  bio            String?    @db.Text
   isActive       Boolean    @default(true)
   
   createdAt      DateTime   @default(now())
