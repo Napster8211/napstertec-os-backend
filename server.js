@@ -48,7 +48,7 @@ app.post('/api/login', async (req, res) => {
             { expiresIn: '8h' }
         );
 
-        // Send token DIRECTLY to frontend memory, completely bypassing cookies
+        // Send token DIRECTLY to frontend memory, bypassing cookies
         res.json({ success: true, token, role: user.role, name: user.fullName });
     } catch (error) {
         console.error("Login Error:", error);
@@ -56,28 +56,39 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// --- SESSION VERIFICATION: Reads Bearer Token ---
+// --- SESSION VERIFICATION WITH BUG CATCHER ---
 app.get('/api/auth/me', async (req, res) => {
-    const authHeader = req.headers.authorization;
+    console.log("[BACKEND CATCHER] 🔍 Incoming request to /api/auth/me");
     
+    const authHeader = req.headers.authorization;
+    console.log("[BACKEND CATCHER] 🔑 Raw Auth Header received:", authHeader ? "YES (hidden for security)" : "NONE");
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ isAuthenticated: false });
+        console.error("[BACKEND CATCHER] ❌ FAILED: No valid Bearer token provided in header.");
+        return res.status(401).json({ isAuthenticated: false, reason: "Missing token" });
     }
 
     const token = authHeader.split(' ')[1];
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'napstertec_master_key_998877');
+        console.log("[BACKEND CATCHER] ✅ Token successfully decoded for User ID:", decoded.userId);
+        
         const user = await prisma.user.findUnique({ 
             where: { id: decoded.userId },
             select: { id: true, email: true, fullName: true, role: true, permissions: true }
         });
         
-        if (!user || !user.isActive) return res.status(401).json({ isAuthenticated: false });
+        if (!user || !user.isActive) {
+            console.error("[BACKEND CATCHER] ❌ FAILED: User not found in database or inactive.");
+            return res.status(401).json({ isAuthenticated: false, reason: "User invalid" });
+        }
         
+        console.log("[BACKEND CATCHER] 🟢 SUCCESS: Access granted to", user.email);
         res.json({ isAuthenticated: true, user });
     } catch (err) {
-        res.status(401).json({ isAuthenticated: false });
+        console.error("[BACKEND CATCHER] ❌ FAILED: JWT Verification Error:", err.message);
+        res.status(401).json({ isAuthenticated: false, reason: err.message });
     }
 });
 
