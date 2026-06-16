@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // The url line has been completely removed
 }
 
 // --- ENUMS: Enforcing Strict System States ---

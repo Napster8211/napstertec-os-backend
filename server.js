@@ -103,3 +103,46 @@ app.get('/api/auth/me', async (req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 NapsterTec OS Engine live on port ${PORT}`);
 });
+
+// --- TEAM MATRIX: RBAC PROTECTED ROUTE ---
+app.get('/api/team', async (req, res) => {
+    console.log("[BACKEND] 🔍 Fetching Team Matrix...");
+    
+    // 1. Check for the digital keycard
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: "Unauthorized access" });
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    try {
+        // 2. Decode the keycard to see WHO is asking
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'napstertec_master_key_998877');
+        
+        // 3. RBAC ENFORCEMENT: Only the Executive Technical Director can view the team
+        if (decoded.role !== 'EXECUTIVE_TECHNICAL_DIRECTOR') {
+            console.error(`[SECURITY] 🚨 Access Denied. User ${decoded.userId} attempted to view Team Matrix without Executive clearance.`);
+            return res.status(403).json({ error: "Insufficient clearance level." });
+        }
+
+        // 4. Fetch the team from Supabase (excluding sensitive password hashes)
+        const team = await prisma.user.findMany({
+            select: {
+                id: true,
+                fullName: true,
+                email: true,
+                role: true,
+                permissions: true,
+                isActive: true,
+                createdAt: true
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        res.json({ success: true, team });
+    } catch (err) {
+        console.error("[BACKEND] ❌ Team Matrix Error:", err.message);
+        res.status(500).json({ error: "Failed to retrieve team data." });
+    }
+});
