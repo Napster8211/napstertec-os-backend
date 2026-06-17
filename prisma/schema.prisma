@@ -56,6 +56,7 @@ model User {
   // Relations
   assignedLeads  Lead[]
   projects       Project[]  @relation("ProjectTeam")
+  tickets        Ticket[]
   auditLogs      AuditLog[]
 }
 
@@ -100,6 +101,7 @@ model Project {
 
   // The team assigned to this project
   team           User[]        @relation("ProjectTeam")
+  tickets        Ticket[]
 }
 
 model AuditLog {
@@ -111,4 +113,23 @@ model AuditLog {
   // Who performed the action
   userId         String?
   user           User?    @relation(fields: [userId], references: [id])
+}
+
+model Ticket {
+  id          String   @id @default(uuid())
+  subject     String
+  description String   @db.Text
+  status      String   @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED
+  priority    String   @default("NORMAL") // LOW, NORMAL, URGENT
+
+  // Link back to the Client who submitted it
+  clientId    String
+  client      User     @relation(fields: [clientId], references: [id])
+
+  // Link to the specific Project having the issue
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

@@ -382,6 +382,66 @@ app.get('/api/client/project', async (req, res) => {
     }
 });
 
+// ==========================================
+// --- MODULE 6: SUPPORT MATRIX (TICKETING) ---
+// ==========================================
+
+// Client Route: Submit a new support ticket
+app.post('/api/client/tickets', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
+
+    try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        
+        const { subject, description, priority, projectId } = req.body;
+        if (!subject || !description || !projectId) return res.status(400).json({ error: "Missing required ticket data." });
+
+        const newTicket = await prisma.ticket.create({
+            data: {
+                subject,
+                description,
+                priority: priority || 'NORMAL',
+                client: { connect: { id: decoded.userId } },
+                project: { connect: { id: projectId } }
+            }
+        });
+
+        res.json({ success: true, ticket: newTicket });
+    } catch (err) {
+        console.error("[BACKEND] ❌ Ticket Creation Error:", err.message);
+        res.status(500).json({ error: "Failed to submit support ticket." });
+    }
+});
+
+// Admin Route: Fetch all global support tickets
+app.get('/api/tickets', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
+
+    try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        
+        // Only internal staff should see the global ticket queue
+        if (decoded.role === 'CLIENT') return res.status(403).json({ error: "Restricted clearance." });
+
+        const tickets = await prisma.ticket.findMany({
+            orderBy: { createdAt: 'desc' },
+            include: {
+                client: { select: { fullName: true, email: true } },
+                project: { select: { title: true } }
+            }
+        });
+
+        res.json({ success: true, tickets });
+    } catch (err) {
+        console.error("[BACKEND] ❌ Ticket Fetch Error:", err.message);
+        res.status(500).json({ error: "Failed to load support matrix." });
+    }
+});
+
 // --- SERVER INITIALIZATION ---
 app.listen(PORT, () => {
     console.log(`[SYSTEM] 🚀 NapsterTec OS Backend Online. Port: ${PORT}`);
