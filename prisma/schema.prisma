@@ -77,6 +77,9 @@ model Lead {
   // Assigned Team Member
   assignedToId   String?
   assignedTo     User?      @relation(fields: [assignedToId], references: [id])
+  
+  // THE BRIDGE: Connects a won lead to its active project
+  project        Project?
 }
 
 model Project {
@@ -90,6 +93,10 @@ model Project {
   
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+
+  // THE BRIDGE: Link back to the CRM Lead
+  leadId         String?       @unique
+  lead           Lead?         @relation(fields: [leadId], references: [id])
 
   // The team assigned to this project
   team           User[]        @relation("ProjectTeam")

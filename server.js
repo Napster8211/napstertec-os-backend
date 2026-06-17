@@ -271,6 +271,83 @@ app.patch('/api/leads/:id', async (req, res) => {
     }
 });
 
+// ==========================================
+// --- MODULE 4: PROJECT EXECUTION MATRIX ---
+// ==========================================
+
+// Fetch all active projects and include their connected client and assigned team
+app.get('/api/projects', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
+
+    try {
+        jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+        
+        const projects = await prisma.project.findMany({
+            orderBy: { updatedAt: 'desc' },
+            include: { 
+                lead: { select: { companyName: true, contactPerson: true } },
+                team: { select: { id: true, fullName: true, role: true, profileImage: true } } 
+            }
+        });
+        res.json({ success: true, projects });
+    } catch (err) {
+        console.error("[BACKEND] ❌ Project Fetch Error:", err.message);
+        res.status(500).json({ error: "Failed to load project matrix." });
+    }
+});
+
+// Initialize a new project and assign it to a won lead and engineering team
+app.post('/api/projects', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
+
+    try {
+        jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+        
+        const { title, description, leadId, deadline, teamIds } = req.body;
+        if (!title || !description) return res.status(400).json({ error: "Project Title and Description are required." });
+
+        const newProject = await prisma.project.create({
+            data: { 
+                title, 
+                description,
+                deadline: deadline ? new Date(deadline) : null,
+                // The Bridge: Connect the project to the client lead
+                lead: leadId ? { connect: { id: leadId } } : undefined,
+                // The Bridge: Connect the assigned engineers
+                team: teamIds && teamIds.length > 0 ? { connect: teamIds.map(id => ({ id })) } : undefined
+            }
+        });
+        res.json({ success: true, project: newProject });
+    } catch (err) {
+        console.error("[BACKEND] ❌ Project Create Error:", err.message);
+        res.status(500).json({ error: "Failed to initialize project." });
+    }
+});
+
+// Update project status, repository links, or deployment URLs
+app.patch('/api/projects/:id', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
+
+    try {
+        jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+        
+        const { id } = req.params;
+        const { status, repoUrl, deploymentUrl } = req.body;
+
+        const updatedProject = await prisma.project.update({
+            where: { id },
+            data: { status, repoUrl, deploymentUrl }
+        });
+        res.json({ success: true, project: updatedProject });
+    } catch (err) {
+        console.error("[BACKEND] ❌ Project Update Error:", err.message);
+        res.status(500).json({ error: "Failed to update project data." });
+    }
+});
+
 // --- SERVER INITIALIZATION ---
 app.listen(PORT, () => {
     console.log(`[SYSTEM] 🚀 NapsterTec OS Backend Online. Port: ${PORT}`);
