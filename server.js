@@ -71,7 +71,6 @@ app.get('/api/auth/me', async (req, res) => {
 // --- MODULE 2: TEAM & PROVISIONING MATRIX ---
 // ==========================================
 
-// Public Route: Read-only bridge for the visitor website
 app.get('/api/public/team', async (req, res) => {
     try {
         const team = await prisma.user.findMany({
@@ -86,7 +85,6 @@ app.get('/api/public/team', async (req, res) => {
     }
 });
 
-// Admin Route: Secure Team Matrix fetch
 app.get('/api/team', async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
@@ -110,9 +108,7 @@ app.get('/api/team', async (req, res) => {
     }
 });
 
-// Admin Route: Upgraded Provisioning (Accepts Bio & Image)
 app.post('/api/team/provision', async (req, res) => {
-    console.log("[BACKEND] ⚡ Provisioning new personnel with extended data...");
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
 
@@ -138,10 +134,7 @@ app.post('/api/team/provision', async (req, res) => {
 
         const newUser = await prisma.user.create({
             data: {
-                fullName,
-                email,
-                passwordHash,
-                role,
+                fullName, email, passwordHash, role,
                 bio: bio || null,
                 profileImage: profileImage || null,
                 permissions: role === 'BUSINESS_DEVELOPMENT' ? ['manage_leads'] : ['view_projects']
@@ -156,7 +149,6 @@ app.post('/api/team/provision', async (req, res) => {
     }
 });
 
-// Admin Route: Update Personnel (Edit Details or Suspend Status)
 app.patch('/api/team/:id', async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
@@ -172,11 +164,7 @@ app.patch('/api/team/:id', async (req, res) => {
         const updatedUser = await prisma.user.update({
             where: { id },
             data: { 
-                fullName, 
-                role, 
-                bio, 
-                profileImage, 
-                isActive,
+                fullName, role, bio, profileImage, isActive,
                 permissions: role === 'BUSINESS_DEVELOPMENT' ? ['manage_leads'] : ['view_projects']
             }
         });
@@ -188,7 +176,6 @@ app.patch('/api/team/:id', async (req, res) => {
     }
 });
 
-// Admin Route: Revoke Keycard (Hard Delete)
 app.delete('/api/team/:id', async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
@@ -218,7 +205,6 @@ app.get('/api/leads', async (req, res) => {
 
     try {
         jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
-        
         const leads = await prisma.lead.findMany({
             orderBy: { updatedAt: 'desc' },
             include: { assignedTo: { select: { fullName: true } } } 
@@ -236,7 +222,6 @@ app.post('/api/leads', async (req, res) => {
 
     try {
         jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
-        
         const { companyName, contactPerson, email, phone } = req.body;
         if (!companyName || !email) return res.status(400).json({ error: "Company Name and Email are required." });
 
@@ -256,7 +241,6 @@ app.patch('/api/leads/:id', async (req, res) => {
 
     try {
         jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
-        
         const { id } = req.params;
         const { status } = req.body;
 
@@ -275,14 +259,12 @@ app.patch('/api/leads/:id', async (req, res) => {
 // --- MODULE 4: PROJECT EXECUTION MATRIX ---
 // ==========================================
 
-// Fetch all active projects and include their connected client and assigned team
 app.get('/api/projects', async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
 
     try {
         jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
-        
         const projects = await prisma.project.findMany({
             orderBy: { updatedAt: 'desc' },
             include: { 
@@ -297,25 +279,21 @@ app.get('/api/projects', async (req, res) => {
     }
 });
 
-// Initialize a new project and assign it to a won lead and engineering team
 app.post('/api/projects', async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
 
     try {
         jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
-        
-        const { title, description, leadId, deadline, teamIds } = req.body;
+        const { title, description, leadId, deadline, teamIds, progress } = req.body;
         if (!title || !description) return res.status(400).json({ error: "Project Title and Description are required." });
 
         const newProject = await prisma.project.create({
             data: { 
-                title, 
-                description,
+                title, description,
+                progress: progress || 0,
                 deadline: deadline ? new Date(deadline) : null,
-                // The Bridge: Connect the project to the client lead
                 lead: leadId ? { connect: { id: leadId } } : undefined,
-                // The Bridge: Connect the assigned engineers
                 team: teamIds && teamIds.length > 0 ? { connect: teamIds.map(id => ({ id })) } : undefined
             }
         });
@@ -326,20 +304,18 @@ app.post('/api/projects', async (req, res) => {
     }
 });
 
-// Update project status, repository links, or deployment URLs
 app.patch('/api/projects/:id', async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
 
     try {
         jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
-        
         const { id } = req.params;
-        const { status, repoUrl, deploymentUrl } = req.body;
+        const { status, repoUrl, deploymentUrl, progress } = req.body;
 
         const updatedProject = await prisma.project.update({
             where: { id },
-            data: { status, repoUrl, deploymentUrl }
+            data: { status, repoUrl, deploymentUrl, progress }
         });
         res.json({ success: true, project: updatedProject });
     } catch (err) {
@@ -349,7 +325,7 @@ app.patch('/api/projects/:id', async (req, res) => {
 });
 
 // ==========================================
-// --- MODULE 5: SECURE CLIENT PORTAL ---
+// --- MODULE 5: SECURE CLIENT PORTAL (UPGRADED) ---
 // ==========================================
 
 app.get('/api/client/project', async (req, res) => {
@@ -360,18 +336,22 @@ app.get('/api/client/project', async (req, res) => {
         const token = authHeader.split(' ')[1];
         const decoded = jwt.verify(token, JWT_SECRET);
         
-        // 1. Identify the logged-in client
         const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
         if (!user || user.role !== 'CLIENT') {
             return res.status(403).json({ error: "Restricted: Client clearance required." });
         }
 
-        // 2. Find the project linked to their CRM email
+        // UPGRADE: Fetch the project AND all the new enterprise relational data
         const project = await prisma.project.findFirst({
             where: { lead: { email: user.email } },
             include: { 
                 lead: { select: { companyName: true, contactPerson: true } },
-                team: { select: { fullName: true, role: true, profileImage: true } } // Show them their assigned engineers
+                team: { select: { fullName: true, role: true, profileImage: true } },
+                activities: { orderBy: { timestamp: 'desc' } },
+                documents: { orderBy: { createdAt: 'desc' }, include: { uploadedBy: { select: { fullName: true } } } },
+                invoices: { orderBy: { issueDate: 'desc' } },
+                milestones: { orderBy: { dueDate: 'asc' } },
+                messages: { orderBy: { createdAt: 'asc' }, include: { sender: { select: { fullName: true, role: true } } } }
             }
         });
 
@@ -386,7 +366,6 @@ app.get('/api/client/project', async (req, res) => {
 // --- MODULE 6: SUPPORT MATRIX (TICKETING) ---
 // ==========================================
 
-// Client Route: Submit a new support ticket
 app.post('/api/client/tickets', async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
@@ -400,9 +379,7 @@ app.post('/api/client/tickets', async (req, res) => {
 
         const newTicket = await prisma.ticket.create({
             data: {
-                subject,
-                description,
-                priority: priority || 'NORMAL',
+                subject, description, priority: priority || 'NORMAL',
                 client: { connect: { id: decoded.userId } },
                 project: { connect: { id: projectId } }
             }
@@ -415,7 +392,6 @@ app.post('/api/client/tickets', async (req, res) => {
     }
 });
 
-// Admin Route: Fetch all global support tickets
 app.get('/api/tickets', async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
@@ -423,8 +399,6 @@ app.get('/api/tickets', async (req, res) => {
     try {
         const token = authHeader.split(' ')[1];
         const decoded = jwt.verify(token, JWT_SECRET);
-        
-        // Only internal staff should see the global ticket queue
         if (decoded.role === 'CLIENT') return res.status(403).json({ error: "Restricted clearance." });
 
         const tickets = await prisma.ticket.findMany({
@@ -442,7 +416,6 @@ app.get('/api/tickets', async (req, res) => {
     }
 });
 
-// Admin Route: Update ticket status (Resolve / In Progress)
 app.patch('/api/tickets/:id', async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
@@ -450,7 +423,6 @@ app.patch('/api/tickets/:id', async (req, res) => {
     try {
         const token = authHeader.split(' ')[1];
         const decoded = jwt.verify(token, JWT_SECRET);
-        
         if (decoded.role === 'CLIENT') return res.status(403).json({ error: "Restricted clearance." });
 
         const { id } = req.params;
@@ -464,6 +436,37 @@ app.patch('/api/tickets/:id', async (req, res) => {
     } catch (err) {
         console.error("[BACKEND] ❌ Ticket Update Error:", err.message);
         res.status(500).json({ error: "Failed to update support ticket." });
+    }
+});
+
+// ==========================================
+// --- MODULE 7: ENTERPRISE DATA (MESSAGES) ---
+// ==========================================
+
+app.post('/api/client/messages', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
+
+    try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        
+        const { content, projectId } = req.body;
+        if (!content || !projectId) return res.status(400).json({ error: "Missing message content." });
+
+        const newMessage = await prisma.message.create({
+            data: {
+                content,
+                project: { connect: { id: projectId } },
+                sender: { connect: { id: decoded.userId } }
+            },
+            include: { sender: { select: { fullName: true, role: true } } }
+        });
+
+        res.json({ success: true, message: newMessage });
+    } catch (err) {
+        console.error("[BACKEND] ❌ Message Creation Error:", err.message);
+        res.status(500).json({ error: "Failed to send message." });
     }
 });
 

@@ -34,6 +34,18 @@ enum ProjectStatus {
   MAINTENANCE
 }
 
+enum InvoiceStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
 // --- MODELS ---
 
 model User {
@@ -58,6 +70,11 @@ model User {
   projects       Project[]  @relation("ProjectTeam")
   tickets        Ticket[]
   auditLogs      AuditLog[]
+  
+  // New Enterprise Portal Relations
+  activities     Activity[]
+  uploadedDocs   Document[]
+  messages       Message[]
 }
 
 model Lead {
@@ -88,6 +105,7 @@ model Project {
   title          String
   description    String        @db.Text
   status         ProjectStatus @default(PLANNING)
+  progress       Int           @default(0) // Master percentage tracking (0-100)
   repoUrl        String?
   deploymentUrl  String?
   deadline       DateTime?
@@ -99,20 +117,100 @@ model Project {
   leadId         String?       @unique
   lead           Lead?         @relation(fields: [leadId], references: [id])
 
-  // The team assigned to this project
+  // Relations
   team           User[]        @relation("ProjectTeam")
   tickets        Ticket[]
+  
+  // New Enterprise Portal Relations
+  activities     Activity[]
+  documents      Document[]
+  invoices       Invoice[]
+  messages       Message[]
+  milestones     Milestone[]
+}
+
+model Milestone {
+  id          String          @id @default(uuid())
+  title       String
+  status      MilestoneStatus @default(PENDING)
+  dueDate     DateTime?
+  completedAt DateTime?
+  
+  projectId   String
+  project     Project         @relation(fields: [projectId], references: [id])
+  
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model Activity {
+  id          String   @id @default(uuid())
+  title       String
+  description String   @db.Text
+  timestamp   DateTime @default(now())
+  
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+  
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+}
+
+model Document {
+  id          String   @id @default(uuid())
+  fileName    String
+  fileUrl     String   // Secure link to AWS S3 / Supabase Storage
+  fileType    String   // e.g., "PDF", "DOCX", "IMAGE"
+  
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+  
+  uploadedById String
+  uploadedBy  User     @relation(fields: [uploadedById], references: [id])
+  
+  createdAt   DateTime @default(now())
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  invoiceNumber String        @unique
+  amount        Float
+  status        InvoiceStatus @default(PENDING)
+  issueDate     DateTime      @default(now())
+  dueDate       DateTime
+  pdfUrl        String?
+  
+  projectId     String
+  project       Project       @relation(fields: [projectId], references: [id])
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Message {
+  id            String   @id @default(uuid())
+  content       String   @db.Text
+  isRead        Boolean  @default(false)
+  attachmentUrl String?
+  
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id])
+  
+  senderId      String
+  sender        User     @relation(fields: [senderId], references: [id])
+  
+  createdAt     DateTime @default(now())
 }
 
 model AuditLog {
-  id             String   @id @default(uuid())
-  action         String   // e.g., "DEPLOY_PROJECT", "DELETE_LEAD"
-  metadata       Json?    // Stores IP, device info, or changed data payload
-  timestamp      DateTime @default(now())
+  id          String   @id @default(uuid())
+  action      String   // e.g., "DEPLOY_PROJECT", "DELETE_LEAD"
+  metadata    Json?    // Stores IP, device info, or changed data payload
+  timestamp   DateTime @default(now())
 
   // Who performed the action
-  userId         String?
-  user           User?    @relation(fields: [userId], references: [id])
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
 }
 
 model Ticket {
