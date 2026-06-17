@@ -156,6 +156,58 @@ app.post('/api/team/provision', async (req, res) => {
     }
 });
 
+// Admin Route: Update Personnel (Edit Details or Suspend Status)
+app.patch('/api/team/:id', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
+
+    try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded.role !== 'EXECUTIVE_TECHNICAL_DIRECTOR') return res.status(403).json({ error: "Insufficient clearance." });
+
+        const { id } = req.params;
+        const { fullName, role, bio, profileImage, isActive } = req.body;
+
+        const updatedUser = await prisma.user.update({
+            where: { id },
+            data: { 
+                fullName, 
+                role, 
+                bio, 
+                profileImage, 
+                isActive,
+                permissions: role === 'BUSINESS_DEVELOPMENT' ? ['manage_leads'] : ['view_projects']
+            }
+        });
+
+        res.json({ success: true, user: updatedUser });
+    } catch (err) {
+        console.error("[BACKEND] ❌ Update Error:", err.message);
+        res.status(500).json({ error: "Failed to update personnel dossier." });
+    }
+});
+
+// Admin Route: Revoke Keycard (Hard Delete)
+app.delete('/api/team/:id', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
+
+    try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded.role !== 'EXECUTIVE_TECHNICAL_DIRECTOR') return res.status(403).json({ error: "Insufficient clearance." });
+
+        const { id } = req.params;
+        await prisma.user.delete({ where: { id } });
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error("[BACKEND] ❌ Delete Error:", err.message);
+        res.status(500).json({ error: "Failed to revoke keycard." });
+    }
+});
+
 // ==========================================
 // --- MODULE 3: CRM LEADS PIPELINE ---
 // ==========================================
