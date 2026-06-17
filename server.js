@@ -442,6 +442,31 @@ app.get('/api/tickets', async (req, res) => {
     }
 });
 
+// Admin Route: Update ticket status (Resolve / In Progress)
+app.patch('/api/tickets/:id', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
+
+    try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        
+        if (decoded.role === 'CLIENT') return res.status(403).json({ error: "Restricted clearance." });
+
+        const { id } = req.params;
+        const { status } = req.body;
+
+        const updatedTicket = await prisma.ticket.update({
+            where: { id },
+            data: { status }
+        });
+        res.json({ success: true, ticket: updatedTicket });
+    } catch (err) {
+        console.error("[BACKEND] ❌ Ticket Update Error:", err.message);
+        res.status(500).json({ error: "Failed to update support ticket." });
+    }
+});
+
 // --- SERVER INITIALIZATION ---
 app.listen(PORT, () => {
     console.log(`[SYSTEM] 🚀 NapsterTec OS Backend Online. Port: ${PORT}`);
