@@ -348,6 +348,40 @@ app.patch('/api/projects/:id', async (req, res) => {
     }
 });
 
+// ==========================================
+// --- MODULE 5: SECURE CLIENT PORTAL ---
+// ==========================================
+
+app.get('/api/client/project', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
+
+    try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        
+        // 1. Identify the logged-in client
+        const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
+        if (!user || user.role !== 'CLIENT') {
+            return res.status(403).json({ error: "Restricted: Client clearance required." });
+        }
+
+        // 2. Find the project linked to their CRM email
+        const project = await prisma.project.findFirst({
+            where: { lead: { email: user.email } },
+            include: { 
+                lead: { select: { companyName: true, contactPerson: true } },
+                team: { select: { fullName: true, role: true, profileImage: true } } // Show them their assigned engineers
+            }
+        });
+
+        res.json({ success: true, project });
+    } catch (err) {
+        console.error("[BACKEND] ❌ Client Portal Error:", err.message);
+        res.status(500).json({ error: "Failed to load client telemetry." });
+    }
+});
+
 // --- SERVER INITIALIZATION ---
 app.listen(PORT, () => {
     console.log(`[SYSTEM] 🚀 NapsterTec OS Backend Online. Port: ${PORT}`);
