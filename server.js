@@ -325,7 +325,7 @@ app.patch('/api/projects/:id', async (req, res) => {
 });
 
 // ==========================================
-// --- MODULE 5: SECURE CLIENT PORTAL (UPGRADED) ---
+// --- MODULE 5: SECURE CLIENT PORTAL ---
 // ==========================================
 
 app.get('/api/client/project', async (req, res) => {
@@ -341,7 +341,6 @@ app.get('/api/client/project', async (req, res) => {
             return res.status(403).json({ error: "Restricted: Client clearance required." });
         }
 
-        // UPGRADE: Fetch the project AND all the new enterprise relational data
         const project = await prisma.project.findFirst({
             where: { lead: { email: user.email } },
             include: { 
@@ -467,6 +466,43 @@ app.post('/api/client/messages', async (req, res) => {
     } catch (err) {
         console.error("[BACKEND] ❌ Message Creation Error:", err.message);
         res.status(500).json({ error: "Failed to send message." });
+    }
+});
+
+// ==========================================
+// --- MODULE 8: CLIENT MANAGEMENT ---
+// ==========================================
+
+// Standard authenticated API route
+app.get('/api/clients', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: "Unauthorized access" });
+
+    try {
+        jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+        
+        const clients = await prisma.client.findMany({
+            orderBy: { createdAt: 'desc' }
+        });
+        
+        res.json({ success: true, clients });
+    } catch (err) {
+        console.error("[BACKEND] ❌ API Client Fetch Error:", err.message);
+        res.status(500).json({ error: "Internal Server Error while fetching clients via API route." });
+    }
+});
+
+// Direct route fallback to catch the specific 404 error from the interceptor
+app.get('/clients', async (req, res) => {
+    try {
+        const clients = await prisma.client.findMany({
+            orderBy: { createdAt: 'desc' }
+        });
+        
+        res.json({ success: true, clients: clients || [] }); 
+    } catch (err) {
+        console.error("[BACKEND] ❌ Base Client Fetch Error:", err.message);
+        res.status(500).json({ error: "Internal Server Error while fetching clients on base route." });
     }
 });
 
