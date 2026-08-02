@@ -481,8 +481,19 @@ app.get('/api/clients', async (req, res) => {
     try {
         jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
         
-        const clients = await prisma.client.findMany({
-            orderBy: { createdAt: 'desc' }
+        // FIX: Query the User model for the 'CLIENT' role
+        const clients = await prisma.user.findMany({
+            where: { role: 'CLIENT' },
+            orderBy: { createdAt: 'desc' },
+            select: { 
+                id: true, 
+                fullName: true, 
+                email: true, 
+                role: true, 
+                isActive: true, 
+                createdAt: true,
+                profileImage: true
+            }
         });
         
         res.json({ success: true, clients });
@@ -492,11 +503,22 @@ app.get('/api/clients', async (req, res) => {
     }
 });
 
-// Direct route fallback to catch the specific 404 error from the interceptor
+// Direct route fallback to catch the specific interceptor call
 app.get('/clients', async (req, res) => {
     try {
-        const clients = await prisma.client.findMany({
-            orderBy: { createdAt: 'desc' }
+        // FIX: Query the User model for the 'CLIENT' role
+        const clients = await prisma.user.findMany({
+            where: { role: 'CLIENT' },
+            orderBy: { createdAt: 'desc' },
+            select: { 
+                id: true, 
+                fullName: true, 
+                email: true, 
+                role: true, 
+                isActive: true, 
+                createdAt: true,
+                profileImage: true
+            }
         });
         
         res.json({ success: true, clients: clients || [] }); 
